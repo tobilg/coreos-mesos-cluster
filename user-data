@@ -1,0 +1,170 @@
+#cloud-config
+
+---
+coreos:
+  etcd2:
+    discovery: https://discovery.etcd.io/3e2e27097fae0333613a5fa0d6372cc7
+    advertise-client-urls: http://$public_ipv4:2379
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
+  fleet:
+    public-ip: $public_ipv4
+  flannel:
+    interface: $public_ipv4
+  units:
+  - name: etcd2.service
+    command: start
+  - name: fleet.service
+    command: start
+  - name: flanneld.service
+    drop-ins:
+    - name: 50-network-config.conf
+      content: |
+        [Service]
+        ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+    command: start
+  - name: docker-tcp.socket
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      Description=Docker Socket for the API
+
+      [Socket]
+      ListenStream=2375
+      Service=docker.service
+      BindIPv6Only=both
+
+      [Install]
+      WantedBy=sockets.target
+  - name: zookeeper.service
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      Description=Zookeeper
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Restart=on-failure
+      RestartSec=20
+      TimeoutStartSec=0
+      ExecStartPre=-/usr/bin/docker kill zookeeper
+      ExecStartPre=-/usr/bin/docker rm zookeeper
+      ExecStartPre=/usr/bin/docker pull tobilg/zookeeper:latest
+      ExecStart=/usr/bin/sh -c "/usr/bin/docker run \
+        --net=host \
+        --name=zookeeper \
+        -e ZOOKEEPER_HOSTS=172.17.8.101:2888:3888,172.17.8.102:2888:3888,172.17.8.103:2888:3888 \
+        -e LOCAL_ZK_IP=$private_ipv4 \
+        -p 2181:2181 \
+        -p 2888:2888 \
+        -p 3888:3888 \
+        tobilg/zookeeper:latest"
+      ExecStop=/usr/bin/docker stop zookeeper
+
+      [Install]
+      WantedBy=multi-user.target
+  - name: mesos-master.service
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      Description=Mesos Master
+      After=zookeeper.service
+      Requires=docker.service
+
+      [Service]
+      Restart=on-failure
+      RestartSec=20
+      TimeoutStartSec=0
+      ExecStartPre=-/usr/bin/docker kill mesos_master
+      ExecStartPre=-/usr/bin/docker rm mesos_master
+      ExecStartPre=/usr/bin/docker pull mesosphere/mesos-master:0.26.0-0.2.145.ubuntu1404
+      ExecStart=/usr/bin/sh -c "/usr/bin/docker run \
+          --name=mesos_master \
+          --net=host \
+          -e MESOS_IP=$private_ipv4 \
+          -e MESOS_HOSTNAME=$private_ipv4 \
+          -e MESOS_CLUSTER=mesos-cluster \
+          -e MESOS_ZK=zk://172.17.8.101:2181,172.17.8.102:2181,172.17.8.103:2181/mesos \
+          -e MESOS_LOG_DIR=/var/log/mesos/master \
+          -e MESOS_WORK_DIR=/var/lib/mesos/master \
+          -e MESOS_QUORUM=2 \
+          mesosphere/mesos-master:0.26.0-0.2.145.ubuntu1404"
+      ExecStop=/usr/bin/docker stop mesos_master
+
+      [Install]
+      WantedBy=multi-user.target
+  - name: mesos-slave.service
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      Description=Mesos Slave
+      After=mesos-master.service
+      Requires=docker.service
+
+      [Service]
+      Restart=on-failure
+      RestartSec=20
+      TimeoutStartSec=0
+      ExecStartPre=-/usr/bin/docker kill mesos_slave
+      ExecStartPre=-/usr/bin/docker rm mesos_slave
+      ExecStartPre=/usr/bin/docker pull mesosphere/mesos-slave:0.26.0-0.2.145.ubuntu1404
+      ExecStart=/usr/bin/sh -c "/usr/bin/docker run \
+          --name=mesos_slave \
+          --net=host \
+          --privileged \
+          -v /sys:/sys \
+          -v /usr/bin/docker:/usr/bin/docker:ro \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v /lib64/libdevmapper.so.1.02:/lib/libdevmapper.so.1.02:ro \
+          -p 5051:5051 \
+          -e MESOS_IP=$private_ipv4 \
+          -e MESOS_HOSTNAME=$private_ipv4 \
+          -e MESOS_CONTAINERIZERS=docker,mesos \
+          -e MESOS_MASTER=zk://172.17.8.101:2181,172.17.8.102:2181,172.17.8.103:2181/mesos \
+          -e MESOS_LOG_DIR=/var/log/mesos/slave \
+          -e MESOS_WORK_DIR=/var/lib/mesos/slave \
+          -e MESOS_EXECUTOR_REGISTRATION_TIMEOUT=5mins \
+          mesosphere/mesos-slave:0.26.0-0.2.145.ubuntu1404 \
+          --executor_shutdown_grace_period=60secs \
+          --docker_stop_timeout=50secs"
+      ExecStop=/usr/bin/docker stop mesos_slave
+
+      [Install]
+      WantedBy=multi-user.target
+  - name: marathon.service
+    command: start
+    enable: true
+    content: |-
+      [Unit]
+      Description=Marathon
+      After=mesos-slave.service
+      Requires=docker.service
+
+      [Service]
+      Restart=on-failure
+      RestartSec=20
+      TimeoutStartSec=0
+      ExecStartPre=-/usr/bin/docker kill marathon
+      ExecStartPre=-/usr/bin/docker rm marathon
+      ExecStartPre=/usr/bin/docker pull mesosphere/marathon:v0.14.1
+      ExecStart=/usr/bin/sh -c "/usr/bin/docker run \
+          --name marathon \
+          -e LIBPROCESS_PORT=9090 \
+          -p 8080:8080 \
+          -p 9090:9090 \
+          mesosphere/marathon:v0.14.1 \
+          --master zk://172.17.8.101:2181,172.17.8.102:2181,172.17.8.103:2181/mesos \
+          --zk zk://172.17.8.101:2181,172.17.8.102:2181,172.17.8.103:2181/marathon \
+          --checkpoint \
+          --hostname $(ifconfig eth1 | grep 'inet ' | cut -d: -f2 | awk '{ print $2}') \
+          --event_subscriber http_callback"
+      ExecStop=/usr/bin/docker stop marathon
+
+      [Install]
+      WantedBy=multi-user.target

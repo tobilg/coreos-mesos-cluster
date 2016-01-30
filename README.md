@@ -58,3 +58,6 @@ For additional docs please have a look at the [original docs](https://github.com
 4) Check Mesos and Marathon functionality
 
 The Mesos Masters/Slaves will be launched on every cluster node, as well as Marathon. Check the [Mesos Master UI](http://172.17.8.101:5050) and the [Marathon UI](http://172.17.8.101:8080)].
+
+[virtualbox]: https://www.virtualbox.org/
+[vagrant]: https://www.vagrantup.com/downloads.html
