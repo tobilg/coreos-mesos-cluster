@@ -20,7 +20,7 @@ The cluster runs the following components on each node:
 2) Clone this project and get it running!
 
 ```
-git clone https://github.com/tobilg/coreos-mesos-cluster/
+git clone https://github.com/tobilg/coreos-mesos-cluster.git
 cd coreos-mesos-cluster
 ```
 
