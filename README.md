@@ -48,6 +48,15 @@ core-02                   running (virtualbox)
 core-03                   running (virtualbox)
 ```
 
+**Please note:**
+It can take a while until all units are up and running, because each node will download four Docker images:
+* Mesos Master
+* Mesos Slave
+* ZooKeeper
+* Marathon
+
+You can check via `docker ps` or `systemctl status <serviceName>` if the units/services are up and running. Depending on your internet connection, this can take up to 30 minutes (for the first launch).
+
 **SSH (to one host)**
 ```
 vagrant ssh core-01 -- -A 
