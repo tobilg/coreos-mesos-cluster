@@ -7,8 +7,8 @@ This repo provides a Vagrantfile as well as a `cloud_config` for a three-node Co
 The cluster runs the following components on each node:
 
 * Apache ZooKeeper 3.4.6
-* Mesos 0.26.0 (Masters / Slaves)
-* Marathon 0.14.1
+* Mesos 0.27.0 (Masters / Slaves)
+* Marathon 0.15.0
 
 ## General setup
 
