@@ -8,7 +8,7 @@ The cluster runs the following components on each node:
 
 * Apache ZooKeeper 3.4.6
 * Mesos 0.27.0 (Masters / Slaves)
-* Marathon 0.15.0
+* Marathon 0.15.2
 
 ## General setup
 
