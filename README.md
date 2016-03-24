@@ -12,19 +12,19 @@ The cluster runs the following components on each node:
 
 ## General setup
 
-1) Install dependencies
+### Install dependencies
 
 * [VirtualBox][virtualbox] 4.3.10 or greater.
 * [Vagrant][vagrant] 1.6 or greater.
 
-2) Clone this project and get it running!
+### Clone this project and get it running!
 
 ```
 git clone https://github.com/tobilg/coreos-mesos-cluster.git
 cd coreos-mesos-cluster
 ```
 
-3) Startup, status and SSH
+### Startup, status and SSH
 
 The VirtualBox provider is the default Vagrant provider. Use this if you are unsure.
 
@@ -64,7 +64,7 @@ vagrant ssh core-01 -- -A
 
 For additional docs please have a look at the [original docs](https://github.com/coreos/coreos-vagrant)
 
-4) Check Mesos and Marathon functionality
+### Check Mesos and Marathon functionality
 
 The Mesos Masters/Slaves will be launched on every cluster node, as well as Marathon. Check the [Mesos Master UI](http://172.17.8.101:5050) and the [Marathon UI](http://172.17.8.101:8080).
 
